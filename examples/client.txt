@@ -1,0 +1,6 @@
+curl -X POST localhost:8080/stateless/encrypt -H "Content-Type: application/json" -d @1.encrypt.example.json
+curl -X POST localhost:8080/stateless/kfrags -H "Content-Type: application/json" -d @2.kfrags.example.json
+curl -X POST localhost:8080/stateless/reencrypt -H "Content-Type: application/json" -d @3.1.reencrypt.example.json
+curl -X POST localhost:8080/stateless/reencrypt -H "Content-Type: application/json" -d @3.2.reencrypt.example.json
+curl -X POST localhost:8080/stateless/decrypt -H "Content-Type: application/json" -d @4.decrypt.example.json
+curl -X POST localhost:8080/stateless/simple_decrypt -H "Content-Type: application/json" -d @5.simple.decrypt.example.json
