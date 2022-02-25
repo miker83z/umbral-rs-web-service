@@ -418,6 +418,7 @@ async fn decrypt_simple_stlss(
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    println!("Running at 0.0.0.0:8022");
     HttpServer::new(|| {
         App::new()
             .data(AppState {
@@ -431,7 +432,7 @@ async fn main() -> std::io::Result<()> {
             .service(decrypt_stlss)
             .service(decrypt_simple_stlss)
     })
-    .bind("127.0.0.1:8080")?
+    .bind("0.0.0.0:8022")?
     .run()
     .await
 }

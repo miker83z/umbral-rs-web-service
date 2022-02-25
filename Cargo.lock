@@ -1828,7 +1828,9 @@ checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
 
 [[package]]
 name = "umbral-rs"
-version = "0.0.1"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7cc3e5c0c97204402cc33db4f3b7abe3f2238cfa424f5d2fd32f63272ad39038"
 dependencies = [
  "blake2",
  "chacha20poly1305",
