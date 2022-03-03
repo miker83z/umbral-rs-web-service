@@ -24,6 +24,29 @@ struct KeyPairJson {
 }
 
 #[derive(Deserialize)]
+struct SignReqJson {
+    signer: KeyPairJson,
+    data: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct SignRespJson {
+    signature: Vec<u8>,
+}
+
+#[derive(Deserialize)]
+struct VerifyReqJson {
+    signature: Vec<u8>,
+    data: String,
+    pk: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct VerifyRespJson {
+    verified: bool,
+}
+
+#[derive(Deserialize)]
 struct EncryptReqJson {
     plaintext: String,
     pk: Vec<u8>,
@@ -31,7 +54,7 @@ struct EncryptReqJson {
 
 #[derive(Serialize, Deserialize)]
 struct EncryptRespJson {
-    cipertext: Vec<u8>,
+    ciphertext: Vec<u8>,
     capsule: Vec<u8>,
 }
 
@@ -69,7 +92,7 @@ struct DecryptReqJson {
     signer: Vec<u8>,
     receiver: KeyPairJson,
     capsule: Vec<u8>,
-    cipertext: Vec<u8>,
+    ciphertext: Vec<u8>,
     cfrags: Vec<Vec<u8>>,
 }
 
@@ -77,7 +100,7 @@ struct DecryptReqJson {
 struct SimpleDecryptReqJson {
     keypair: KeyPairJson,
     capsule: Vec<u8>,
-    cipertext: Vec<u8>,
+    ciphertext: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -111,6 +134,72 @@ async fn signer(data: web::Data<AppState>) -> Result<impl Responder, GenericErro
     }
 }
 
+#[post("/stateless/sign")]
+async fn sign_stlss(
+    data: web::Data<AppState>,
+    request_payload: web::Json<SignReqJson>,
+) -> Result<impl Responder, GenericError> {
+    let signr = match Signer::from_bytes(
+        &request_payload.signer.pk,
+        &request_payload.signer.sk,
+        &data.params,
+    ) {
+        Ok(x) => x,
+        Err(_) => {
+            return Err(GenericError {
+                info: "Keypair serialization Error",
+            });
+        }
+    };
+    let data = request_payload.data.as_bytes().to_vec();
+
+    let signature = signr.sign_sha2(&data);
+
+    let resp = SignRespJson {
+        signature: signature.to_bytes(),
+    };
+    match serde_json::to_string(&resp) {
+        Ok(j) => Ok(HttpResponse::Ok().body(j)),
+        Err(_) => Err(GenericError {
+            info: "Signature serialization error",
+        }),
+    }
+}
+
+#[post("/stateless/verify")]
+async fn verify_stlss(
+    data: web::Data<AppState>,
+    request_payload: web::Json<VerifyReqJson>,
+) -> Result<impl Responder, GenericError> {
+    let signatr = match Signature::from_bytes(&request_payload.signature, &data.params) {
+        Ok(x) => x,
+        Err(_) => {
+            return Err(GenericError {
+                info: "Signature serialization Error",
+            });
+        }
+    };
+    let pk = match CurvePoint::from_bytes(&request_payload.pk, &data.params) {
+        Ok(x) => x,
+        Err(_) => {
+            return Err(GenericError {
+                info: "PubKey serialization error",
+            });
+        }
+    };
+    let data = request_payload.data.as_bytes().to_vec();
+
+    let verified = signatr.verify_sha2(&data, &pk);
+
+    let resp = VerifyRespJson { verified };
+    match serde_json::to_string(&resp) {
+        Ok(j) => Ok(HttpResponse::Ok().body(j)),
+        Err(_) => Err(GenericError {
+            info: "Signature serialization error",
+        }),
+    }
+}
+
 #[post("/stateless/encrypt")]
 async fn encrypt_stlss(
     data: web::Data<AppState>,
@@ -134,7 +223,7 @@ async fn encrypt_stlss(
         }
     };
     let resp = EncryptRespJson {
-        cipertext: cipert,
+        ciphertext: cipert,
         capsule: cap.to_bytes(),
     };
     match serde_json::to_string(&resp) {
@@ -337,7 +426,7 @@ async fn decrypt_stlss(
             }
         };
     }
-    let plaintext = match decrypt(request_payload.cipertext.to_owned(), &cap, &bob, true) {
+    let plaintext = match decrypt(request_payload.ciphertext.to_owned(), &cap, &bob, true) {
         Ok(x) => x,
         Err(_) => {
             return Err(GenericError {
@@ -389,7 +478,7 @@ async fn decrypt_simple_stlss(
             });
         }
     };
-    let plaintext = match decrypt(request_payload.cipertext.to_owned(), &cap, &alice, true) {
+    let plaintext = match decrypt(request_payload.ciphertext.to_owned(), &cap, &alice, true) {
         Ok(x) => x,
         Err(_) => {
             return Err(GenericError {
@@ -426,6 +515,8 @@ async fn main() -> std::io::Result<()> {
             })
             .service(keypair)
             .service(signer)
+            .service(sign_stlss)
+            .service(verify_stlss)
             .service(encrypt_stlss)
             .service(kfrags_stlss)
             .service(reencrypt_stlss)
