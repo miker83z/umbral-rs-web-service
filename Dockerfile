@@ -10,7 +10,7 @@ RUN cargo build --release
 
 FROM gcr.io/distroless/cc-debian10
 
-EXPOSE 8080
+#EXPOSE 8080
 
 COPY --from=builder /usr/src/auth-api/target/release/auth-api /usr/local/bin/auth-api
 

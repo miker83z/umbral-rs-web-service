@@ -1,3 +1,4 @@
+use std::env;
 use actix_web::{error, get, post, web, App, HttpResponse, HttpServer, Responder, Result};
 use derive_more::{Display, Error};
 use serde::{Deserialize, Serialize};
@@ -507,7 +508,8 @@ async fn decrypt_simple_stlss(
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    println!("Running at 0.0.0.0:8022");
+    let port = env::var("AUTH_API_PORT").expect("$AUTH_API_PORT is not set");
+    println!("Running at 0.0.0.0:{}", port);
     HttpServer::new(|| {
         App::new()
             .data(AppState {
@@ -523,7 +525,7 @@ async fn main() -> std::io::Result<()> {
             .service(decrypt_stlss)
             .service(decrypt_simple_stlss)
     })
-    .bind("0.0.0.0:8022")?
+    .bind(format!("{}{}", "0.0.0.0:".to_string(), port))?
     .run()
     .await
 }
