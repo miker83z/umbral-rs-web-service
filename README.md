@@ -5,7 +5,9 @@ This web service enables the execution of the Umbral TPRE operations.
 
 ## Usage
 
-just do
+- install it `cargo install --git https://github.com/disnocen/umbral-rs --branch feat_keydistrib`
+- clone this repo
+- in the folder of this repo: just do
 
 ```
 cargo run
