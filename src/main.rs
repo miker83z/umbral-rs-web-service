@@ -7,12 +7,14 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::{clone, vec};
 use umbral_rs::internal::curve::*;
+// use umbral_rs::internal::curve::{CurveBN, CurvePoint,};
 use umbral_rs::internal::keyredistrib::*;
 use umbral_rs::internal::keys::*;
 use umbral_rs::pre::*;
 
-use openssl::bn::{BigNum, BigNumContext};
+use openssl::bn::{BigNum, BigNumContext, BigNumRef};
 
 // util functions
 
@@ -132,12 +134,127 @@ impl KeyState {
     }
 }
 
+struct IdState {
+    n: usize,
+    threshold: usize,
+    id_vec: Vec<String>,
+}
+
+impl Clone for IdState {
+    fn clone(&self) -> Self {
+        // let mut bns: Vec<String> = Vec::new();
+        // for i in self.id_vec.iter() {
+        //     let bn = i.to_hex_str().unwrap();
+        //     bns.push(bn.to_string());
+        // }
+
+        // let mut id_vec_clone: Vec<BigNumRef> = Vec::new();
+        // let mut id_vec_iter = self.id_vec.iter();
+
+        // for i in bns.iter() {
+        //     let bn = BigNum::from_hex_str(i).unwrap();
+        //     // convert BigNum to BigNumRef
+        //     let bn_ref = &bn;
+
+        //     id_vec_clone.push(bn_ref);
+        // }
+
+        IdState {
+            n: self.n,
+            threshold: self.threshold,
+            id_vec: self.id_vec.clone(),
+        }
+    }
+}
+
+impl IdState {
+    fn new(n: usize, threshold: usize) -> IdState {
+        let id_vec: Vec<String> = Vec::new();
+
+        IdState {
+            n,
+            threshold,
+            id_vec,
+        }
+    }
+
+    fn Copy(&self) -> IdState {
+        IdState {
+            n: self.n,
+            threshold: self.threshold,
+            id_vec: self.id_vec.clone(),
+        }
+    }
+
+    fn clone(&self) -> Self {
+        IdState {
+            n: self.n,
+            threshold: self.threshold,
+            id_vec: self.id_vec.clone(),
+        }
+    }
+
+    fn get_threshold(&self) -> usize {
+        self.threshold
+    }
+
+    fn get_n(&self) -> usize {
+        self.n
+    }
+
+    fn add_id(&mut self, id: &String) -> Self {
+        self.id_vec.push(id.clone());
+
+        let n = self.n;
+        let threshold = self.threshold;
+        let id_vec = self.id_vec.clone();
+
+        IdState {
+            n,
+            threshold,
+            id_vec,
+        }
+    }
+
+    fn has_id(&self, id: &String) -> bool {
+        let mut id_iter = self.id_vec.iter();
+        // O(n) search
+        let mut flag = false;
+        for _ in 0..self.id_vec.len() {
+            if id_iter.next() == Some(&id) {
+                flag = true;
+                break;
+            }
+        }
+        flag
+    }
+
+    fn delete_idstate(&mut self) -> Self {
+        let n = 0;
+        let threshold = 0;
+
+        IdState {
+            n,
+            threshold,
+            id_vec: Vec::new(),
+        }
+    }
+
+    fn get_private_keys_number(&self) -> usize {
+        self.id_vec.len()
+    }
+}
+
 #[derive(Deserialize)]
 struct KeyRefreash {
     sid: usize,
     parties: usize,
     threshold: usize,
-    keypair: KeyPairJson,
+    dh_point: Vec<u8>,
+    precursor: Vec<u8>,
+    delegatee_key: Vec<u8>,
+    id: String,
+    sk: Vec<u8>,
 }
 
 // struct AppState {
@@ -147,6 +264,7 @@ struct KeyRefreash {
 
 struct AppState {
     keystate: Mutex<HashMap<usize, KeyState>>,
+    idstate: Mutex<HashMap<usize, IdState>>,
 }
 
 impl AppState {
@@ -154,6 +272,7 @@ impl AppState {
         AppState {
             // params,
             keystate: Mutex::new(HashMap::new()),
+            idstate: Mutex::new(HashMap::new()),
         }
     }
 
@@ -170,6 +289,7 @@ impl Clone for AppState {
         AppState {
             // params: self.params.clone(),
             keystate: Mutex::new(self.keystate.lock().unwrap().clone()),
+            idstate: Mutex::new(self.idstate.lock().unwrap().clone()),
         }
     }
 }
@@ -446,7 +566,9 @@ async fn kfrags_stlss(
         request_payload.nodes_number,
         &signr,
         KFragMode::DelegatingAndReceiving,
-    ) {
+    )
+    .0
+    {
         Ok(x) => x,
         Err(_) => {
             return Err(GenericError {
@@ -687,8 +809,24 @@ async fn keyrefresh_stfl(
     // let params = &data.params;
     let N = request_payload.parties;
     let t = request_payload.threshold;
-    let pk = &request_payload.keypair.pk;
-    let sk_bytes = request_payload.keypair.sk.clone();
+    let dh_point =
+        CurvePoint::from_bytes(&request_payload.dh_point, &params).unwrap_or_else(|_| {
+            panic!("Error while deserializing dh_point.");
+        });
+    let precursor =
+        CurvePoint::from_bytes(&request_payload.precursor, &params).unwrap_or_else(|_| {
+            panic!("Error while deserializing precursor.");
+        });
+    let delegatee_key = CurvePoint::from_bytes(&request_payload.delegatee_key, &params)
+        .unwrap_or_else(|_| {
+            panic!("Error while deserializing delegatee_key.");
+        });
+
+    let id_hash = &request_payload.id;
+    let id = BigNum::from_hex_str(&request_payload.id).unwrap();
+    let id_ref = &id;
+
+    let sk_bytes = request_payload.sk.clone();
     let sk = CurveBN::from_bytes(&sk_bytes, &params).unwrap();
 
     // 2.1. if exists already, stop
@@ -704,6 +842,7 @@ async fn keyrefresh_stfl(
     // }
     // get the key state from the keystate map
     let mut keystateMap = data.keystate.lock().unwrap();
+    let mut idstateMap = data.idstate.lock().unwrap();
     // let mut keystate = data.keystate[&sid];
     let mut resp0: String;
 
@@ -712,24 +851,46 @@ async fn keyrefresh_stfl(
     // if it is, check if the key is already refreshed
     if keystateMap.contains_key(&sid) {
         resp0 = format!("Key state already exists for sid: {}", sid);
-        // let curr_keystate = keystate.get(&sid).unwrap();
-        // check if private key is already in the current keystate
+
+        // check if the key is already listed to be refreshed
         if keystateMap[&sid].has_private_key(&sk_bytes) {
             resp0 = format!("{}. Key already in there", resp0);
             return Err(GenericError {
                 info: "Key already in there",
             });
         }
+
+        // check if the id is already listed to be refreshed
+        if idstateMap[&sid].has_id(&id_hash) {
+            resp0 = format!("{}. ID already in there", resp0);
+            return Err(GenericError {
+                info: "ID already in there",
+            });
+        }
+
+        // add key to the keystate
         let mut ks = keystateMap[&sid].clone();
         ks.add_private_key(sk_bytes);
         *keystateMap.get_mut(&sid).unwrap() = ks;
+
+        // add id to the idstate
+        let mut is = idstateMap[&sid].clone();
+        is.add_id(id_hash);
+        *idstateMap.get_mut(&sid).unwrap() = is;
     } else {
         resp0 = format!("Key state does not exist for sid: {}", sid);
         let mut ks = KeyState::new(N, t);
         // let mut ks = keystateMap[&sid].clone();
+
+        // add key to the keystate
         ks.add_private_key(sk_bytes);
         // *keystateMap.get_mut(&sid).unwrap() = ks;
         keystateMap.insert(sid, ks);
+
+        // add id to the idstate
+        let mut is = IdState::new(N, t);
+        is.add_id(id_hash);
+        idstateMap.insert(sid, is);
     }
 
     let curr_key_length = keystateMap[&sid].get_private_keys_number();
@@ -748,7 +909,36 @@ async fn keyrefresh_stfl(
         let key_vector_curveBN = key_vector_iter
             .map(|x| CurveBN::from_bytes(x, &params).unwrap())
             .collect();
-        let res = key_refresh(&key_vector_curveBN, t as u32, &params);
+
+        let mut ids_vector: Vec<&BigNumRef> = Vec::new();
+        // for idh in idstateMap[&sid].id_vec.iter() {
+        //     let id_bignum2 = BigNum::from_hex_str(idh).unwrap();
+        //     let id_ref2 = id_bignum2;
+        //     ids_vector.push(&id_ref2);
+        // }
+
+        let ids_vector2: Vec<BigNum> = idstateMap[&sid]
+            .id_vec
+            .iter()
+            .map(|x| BigNum::from_hex_str(x).unwrap())
+            .collect();
+
+        let ids_vector3: Vec<&BigNum> = ids_vector2.iter().map(|x| x).collect();
+
+        let mut ids_vector4: Vec<&BigNumRef> = Vec::new();
+        for i in ids_vector3.iter() {
+            let bn4 = &i;
+            ids_vector4.push(bn4);
+        }
+        let res = key_refresh(
+            &key_vector_curveBN,
+            ids_vector4,
+            dh_point,
+            &delegatee_key,
+            &precursor,
+            t as u32,
+            &params,
+        );
         // print the result
         resp_raw = format!("Result: {:?}", res);
         resp = KeyRefreshRespJson { resp: resp_raw };
@@ -794,6 +984,7 @@ async fn main() -> std::io::Result<()> {
     let keystate = web::Data::new(AppState {
         // params: arc_params,
         keystate: Mutex::new(HashMap::new()),
+        idstate: Mutex::new(HashMap::new()),
     });
     HttpServer::new(move || {
         App::new()
