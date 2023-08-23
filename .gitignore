@@ -1,3 +1,4 @@
 /target
 /dist/auth-api_latest
 .DS_Store
+js/node_modules
