@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="css/main.css" />
+
+    <title>Execute Function</title>
+  </head>
+  <body>
+    <button class="generate" id="generateKeypairButtonAlice">
+      Generate Keypair Alice
+    </button>
+    <div class="result" id="keypairResultAlice"></div>
+    <!-- This is where the result will be displayed -->
+    <button class="generate" id="generateKeypairButtonSigner">
+      Generate Keypair Signer
+    </button>
+    <div class="result" id="keypairResultSigner"></div>
+    <!-- This is where the result will be displayed -->
+    <button class="generate" id="generateKeypairButtonBob">
+      Generate Keypair Bob
+    </button>
+    <div class="result" id="keypairResultBob"></div>
+    <!-- This is where the result will be displayed -->
+
+    <script>
+      function formatData(data) {
+        let formattedData = "";
+        for (let key in data) {
+          if (Array.isArray(data[key])) {
+            formattedData += `${key}: 0x${data[key]
+              .map((byte) => byte.toString(16).padStart(2, "0"))
+              .join("")}<br>`;
+          } else {
+            formattedData += `${key}: ${data[key]}<br>`;
+          }
+        }
+        return formattedData;
+      }
+
+      document
+        .getElementById("generateKeypairButtonAlice")
+        .addEventListener("click", async function () {
+          try {
+            const response = await fetch("/generateKeypairAlice");
+            const data = await response.json();
+            console.log(data);
+            // Convert JSON object to formatted string for display
+            const formattedResult = formatData(data);
+            document.getElementById("keypairResultAlice").innerHTML =
+              formattedResult;
+          } catch (error) {
+            console.error("Error while fetching keypair:", error);
+          }
+        });
+      document
+        .getElementById("generateKeypairButtonSigner")
+        .addEventListener("click", async function () {
+          try {
+            const response = await fetch("/generateKeypairSigner");
+            const data = await response.json();
+            console.log(data);
+            // Convert JSON object to formatted string for display
+            const formattedResult = formatData(data);
+            document.getElementById("keypairResultSigner").innerHTML =
+              formattedResult;
+          } catch (error) {
+            console.error("Error while fetching keypair:", error);
+          }
+        });
+      document
+        .getElementById("generateKeypairButtonBob")
+        .addEventListener("click", async function () {
+          try {
+            const response = await fetch("/generateKeypairBob");
+            const data = await response.json();
+            console.log(data);
+            const formattedResult = formatData(data);
+            document.getElementById("keypairResultBob").innerHTML =
+              formattedResult;
+          } catch (error) {
+            console.error("Error while fetching keypair:", error);
+          }
+        });
+    </script>
+  </body>
+</html>
