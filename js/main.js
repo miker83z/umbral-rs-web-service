@@ -37,10 +37,19 @@ const webapp = async () => {
     res.sendFile(path.join(__dirname, "public", "index.html"));
   });
 
+  app.get("/getSessionID", async (req, res) => {
+    try {
+      res.json(sid); // send the result as JSON
+      console.log(sid);
+    } catch (error) {
+      res.status(500).json({ error: "Error Getting session id" });
+    }
+  });
   app.get("/generateKeypairAlice", async (req, res) => {
     try {
-      const alice = (await auth.requestKeypair()).data;
+      var alice = (await auth.requestKeypair()).data;
       res.json(alice); // send the result as JSON
+      console.log(alice);
     } catch (error) {
       res.status(500).json({ error: "Error generating keypair" });
     }

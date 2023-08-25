@@ -1,0 +1,157 @@
+<!-- threshold.html -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Threshold Operations</title>
+  </head>
+  <body>
+    <select id="parties">
+      <option value="" disabled selected>Select number of parties</option>
+      <!-- Populate with numbers 1-20 -->
+    </select>
+
+    <select id="threshold" disabled>
+      <option value="" disabled selected>Select threshold</option>
+      <!-- Populate dynamically based on the number of parties chosen -->
+    </select>
+
+    <div id="results"></div>
+    <!-- Area to display instructions and outcomes -->
+
+    <script>
+      // Asynchronously fetch the session ID
+      async function fetchSessionID() {
+        try {
+          let response = await fetch("/getSessionID");
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          let sessionID = await response.text(); // Assuming the session ID is returned as plain text
+
+          // Now store the sessionID for later use
+          // For this example, I'll use sessionStorage, but you can use any storage mechanism you prefer
+          sessionStorage.setItem("sessionID", sessionID);
+
+          console.log("Session ID fetched and stored:", sessionID);
+        } catch (error) {
+          console.error("Failed to fetch session ID:", error);
+        }
+      }
+
+      // Call the function to fetch the session ID as soon as the script runs
+      fetchSessionID();
+
+      // to fect instanceof
+      // let storedSessionID = sessionStorage.getItem('sessionID');
+
+      const resultsDiv = document.getElementById("results");
+      const partiesDropdown = document.getElementById("parties");
+      const thresholdDropdown = document.getElementById("threshold");
+
+      // Data storage
+      const dataStore = {
+        nParties: null,
+        nThreshold: null,
+      };
+
+      // Populate parties dropdown with numbers 1-20
+      for (let i = 1; i <= 20; i++) {
+        partiesDropdown.innerHTML += `<option value="${i}">${i}</option>`;
+      }
+
+      // Event listener for parties dropdown change
+      partiesDropdown.addEventListener("change", function () {
+        const num = parseInt(this.value);
+        dataStore.nParties = num;
+
+        thresholdDropdown.disabled = false; // Enable threshold dropdown
+        thresholdDropdown.innerHTML =
+          '<option value="" disabled selected>Select threshold</option>'; // Reset threshold dropdown
+
+        // Populate threshold dropdown with numbers 1 to num
+        for (let i = 1; i <= num; i++) {
+          thresholdDropdown.innerHTML += `<option value="${i}">${i}</option>`;
+        }
+      });
+
+      // Event listener for threshold dropdown change
+      thresholdDropdown.addEventListener("change", async function () {
+        dataStore.nThreshold = parseInt(this.value);
+
+        // Generate key pair buttons
+        for (let i = 1; i <= dataStore.nParties; i++) {
+          console.log(`Creating button for AS${i}`);
+
+          var btn = document.createElement("button");
+          btn.innerHTML = `AS${i} KeyPair Gen`;
+          btn.onclick = ((index) => {
+            return async () => {
+              console.log(`Button AS${index} clicked`);
+
+              //   fetch("/generateKeypairAlice")
+              //     .then((response) => {
+              //       if (!response.ok) {
+              //         throw new Error(`HTTP error! Status: ${response.status}`);
+              //       }
+              //       return response.json();
+              //     })
+              //     .then((keyData) => {
+              //       dataStore[`AS${index}`] = keyData;
+              //       resultsDiv.innerHTML += `AS${index} KeyPair: ${JSON.stringify(
+              //         keyData
+              //       )}<br>`;
+              //     })
+              //     .catch((error) => {
+              //       console.error(`Error on button AS${index}:`, error);
+              //     });
+
+              var response = await fetch("/generateKeypairAlice");
+              var keyData = await response.json();
+              dataStore[`AS${index}`] = keyData;
+              let newElement = document.createElement("div");
+              newElement.innerHTML = `AS${index} KeyPair: ${JSON.stringify(
+                keyData
+              )}<br>`;
+              resultsDiv.appendChild(newElement);
+
+              // Check if we have generated the required number of key pairs
+              var generatedKeyPairs = Object.keys(dataStore).filter((k) =>
+                k.startsWith("AS")
+              ).length;
+              console.log(`Generated KeyPairs: ${generatedKeyPairs}`);
+
+              if (generatedKeyPairs === dataStore.nThreshold) {
+                console.log(
+                  `Creating buttons for dhPoint, precursor, and delegateeKey`
+                );
+
+                // Create buttons for "DH point", "Precursor", and "Delegatee key" key pairs
+                ["dhPoint", "precursor", "delegateeKey"].forEach((name) => {
+                  var newBtn = document.createElement("button");
+                  newBtn.innerHTML =
+                    name.charAt(0).toUpperCase() +
+                    name.slice(1) +
+                    " KeyPair Gen";
+                  newBtn.onclick = async () => {
+                    var response = await fetch("/generateKeypairAlice");
+                    var keyData = await response.json();
+                    dataStore[name] = keyData;
+                    let newElement = document.createElement("div");
+                    newElement.innerHTML = `${name} KeyPair: ${JSON.stringify(
+                      keyData
+                    )}<br>`;
+                    resultsDiv.appendChild(newElement);
+                  };
+                  resultsDiv.appendChild(newBtn);
+                });
+              }
+            };
+          })(i);
+          resultsDiv.appendChild(btn);
+        }
+      });
+    </script>
+  </body>
+</html>
