@@ -5,11 +5,15 @@ const { BrokerService } = require("./lib/broker");
 // const { Web3Wrapper, artifact } = require('./lib/web3Wrapper');
 const { publicKeyCreate } = require("secp256k1");
 const express = require("express");
+const bodyParser = require("body-parser");
+const crypto = require("crypto");
+
 const app = express();
 const port = 3000;
 const path = require("path"); // Add this to the top of your code
 
 app.use(express.static("public"));
+app.use(bodyParser.json());
 
 const MNEMONIC = process.env.MNEMONIC;
 
@@ -19,7 +23,11 @@ function getRandomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min; // The maximum is inclusive and the minimum is inclusive
 }
 
-const sid = getRandomInt(1, 100000); // Generates a random number between 1 and 100 (inclusive)
+function generateRandomID(length = 16) {
+  return crypto.randomBytes(length).toString("hex");
+}
+
+var sid = getRandomInt(1, 100000); // Generates a random number between 1 and 100 (inclusive)
 console.log("current session id:" + sid);
 
 const webapp = async () => {
@@ -45,6 +53,7 @@ const webapp = async () => {
       res.status(500).json({ error: "Error Getting session id" });
     }
   });
+
   app.get("/generateKeypairAlice", async (req, res) => {
     try {
       var alice = (await auth.requestKeypair()).data;
@@ -70,6 +79,69 @@ const webapp = async () => {
       res.json(alice); // send the result as JSON
     } catch (error) {
       res.status(500).json({ error: "Error generating keypair" });
+    }
+  });
+
+  app.post("/keyReShuffle", async (req, res) => {
+    try {
+      console.log("req.body exists?", !!req.body);
+      // if (req.body) {
+      //   console.log("req.body:", JSON.stringify(req.body));
+      // }
+      const keyStore = req.body.keyStore; // Retrieve the keyStore from the request body
+      console.log("lets print some data");
+      console.log("number of parties: " + keyStore.nParties);
+      console.log("number of threshold: " + keyStore.nThreshold);
+      console.log("AS1 priv key: " + keyStore.AS1.sk);
+
+      const parties = keyStore.nParties;
+      const threshold = keyStore.nThreshold;
+      const dh_point = keyStore.dhPoint.pk;
+      const precursor = keyStore.precursor.pk;
+      const delegatee_key = keyStore.delegateeKey.pk;
+      // sid already defined
+
+      // get al sk and create ids from AS
+      const secretKeys = {};
+      const ids = {};
+
+      for (const key in keyStore) {
+        if (key.startsWith("AS")) {
+          secretKeys[key] = keyStore[key].sk;
+          ids[key] = generateRandomID();
+        }
+      }
+
+      var serverResponse = {};
+
+      //ciao
+      for (const key in secretKeys) {
+        const jsonData = {
+          sid: sid,
+          parties: parties,
+          threshold: threshold,
+          dh_point: dh_point,
+          precursor: precursor,
+          delegatee_key: delegatee_key,
+          id: ids[key],
+          sk: secretKeys[key],
+        };
+        console.log(jsonData);
+        // console.log((await auth.keyrefresh(JSON.stringify(jsonData))).data); // Pass keyStore to your keyrefresh function
+        serverResponse = (await auth.keyrefresh(jsonData)).data;
+        console.log(serverResponse); // Pass keyStore to your keyrefresh function
+      }
+      res.json(serverResponse);
+      sid = getRandomInt(1, 100000); // Generates a random number between 1 and 100 (inclusive)
+      console.log("new sid: " + sid);
+
+      // console.log(JSON.stringify(keyStore));
+      // const refreshed_keys = (await auth.keyrefresh(keyStore)).data; // Pass keyStore to your keyrefresh function
+      // res.json(refreshed_keys); // Send the result as JSON
+    } catch (error) {
+      res.status(500).json({ error: "Error generating keypair" });
+      console.error("Error occurred:", error);
+      // console.log(error);
     }
   });
 

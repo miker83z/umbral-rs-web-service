@@ -1,7 +1,8 @@
 # Web app implementation
 
+NB: note that  the web service should be running already
 
-in this directory:
+to start the project, in this directory do:
 
 ```
 sh start.sh

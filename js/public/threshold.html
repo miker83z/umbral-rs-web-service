@@ -7,6 +7,7 @@
     <title>Threshold Operations</title>
   </head>
   <body>
+    <!-- <input id="sid" type="number">Select session ID</input> -->
     <select id="parties">
       <option value="" disabled selected>Select number of parties</option>
       <!-- Populate with numbers 1-20 -->
@@ -41,7 +42,7 @@
       }
 
       // Call the function to fetch the session ID as soon as the script runs
-      fetchSessionID();
+      // fetchSessionID();
 
       // to fect instanceof
       // let storedSessionID = sessionStorage.getItem('sessionID');
@@ -49,6 +50,8 @@
       const resultsDiv = document.getElementById("results");
       const partiesDropdown = document.getElementById("parties");
       const thresholdDropdown = document.getElementById("threshold");
+      // const sid = document.getElementById("sid");
+      // console.log("sid is: " + sid)
 
       // Data storage
       const dataStore = {
@@ -127,8 +130,12 @@
                   `Creating buttons for dhPoint, precursor, and delegateeKey`
                 );
 
+                let buttonNames = ["dhPoint", "precursor", "delegateeKey"];
+                let buttonsPressed = {}; // To track which buttons have been pressed
+                let canReshuffle = 0; // Flag
+
                 // Create buttons for "DH point", "Precursor", and "Delegatee key" key pairs
-                ["dhPoint", "precursor", "delegateeKey"].forEach((name) => {
+                buttonNames.forEach((name) => {
                   var newBtn = document.createElement("button");
                   newBtn.innerHTML =
                     name.charAt(0).toUpperCase() +
@@ -143,6 +150,53 @@
                       keyData
                     )}<br>`;
                     resultsDiv.appendChild(newElement);
+
+                    // Mark this button as pressed
+                    buttonsPressed[name] = true;
+
+                    // Check if all buttons have been pressed
+                    if (
+                      buttonNames.every(
+                        (buttonName) => buttonsPressed[buttonName]
+                      )
+                    ) {
+                      canReshuffle = 1;
+                      console.log("canshuffle == 1");
+
+                      //crete the reshuffle button
+                      var newBtn = document.createElement("button");
+                      newBtn.innerHTML = "Key Reshuffle";
+                      newBtn.onclick = async () => {
+                        try {
+                          var response = await fetch("/keyReShuffle", {
+                            method: "POST",
+                            headers: {
+                              "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({ keyStore: dataStore }),
+                          });
+
+                          // Handle the response as needed
+                          if (response.ok) {
+                            var refreshedKeys = await response.json();
+                            let newElement = document.createElement("div");
+                            newElement.innerHTML = `${JSON.stringify(
+                              refreshedKeys
+                            )}<br>`;
+                            console.log(refreshedKeys);
+                            resultsDiv.appendChild(newElement);
+                            // Do something with refreshedKeys
+                          } else {
+                            console.error("Failed to reshuffle keys");
+                          }
+                        } catch (err) {
+                          console.error("Error:", err);
+                        }
+                        console.log(JSON.stringify({ keyStore: dataStore }));
+                      };
+
+                      resultsDiv.appendChild(newBtn);
+                    }
                   };
                   resultsDiv.appendChild(newBtn);
                 });
