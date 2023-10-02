@@ -1,0 +1,27 @@
+/* css/main.css */
+
+button.generate {
+  background-color: #1877f2;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: 0.3s background-color ease-in-out;
+}
+
+button.generate:hover {
+  background-color: #165dbb;
+}
+
+.result {
+  font-family: "Courier New", monospace; /* This will give it a monospace font */
+  color: #555555;
+  background-color: #f5f5f5; /* This is a light grey background */
+  padding: 10px; /* Add some padding for aesthetics */
+  border-radius: 5px; /* Round the corners a bit */
+  border: 1px solid #ccc; /* A subtle border */
+  white-space: pre-wrap; /* This will preserve spaces and line breaks */
+  overflow-x: auto; /* If the content is too wide, it'll be scrollable */
+}
